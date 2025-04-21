@@ -1,0 +1,115 @@
+from aiogram import Bot, Dispatcher, executor, types
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.contrib.middlewares.logging import LoggingMiddleware
+import random
+import logging
+
+# Установите ваш токен
+API_TOKEN = 'ВАШ_ТОКЕН_БОТА'
+
+# Логирование
+logging.basicConfig(level=logging.INFO)
+
+# Инициализация бота и диспетчера
+bot = Bot(token=API_TOKEN)
+dp = Dispatcher(bot)
+dp.middleware.setup(LoggingMiddleware())
+
+# Главное меню
+def main_menu():
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+    keyboard.add(KeyboardButton("🍉 Добавить воду"))
+    keyboard.add(KeyboardButton("📊 Статистика"), KeyboardButton("🏆 Рейтинг"))
+    keyboard.add(KeyboardButton("⚙️ Настройки"))
+    return keyboard
+
+# Клавиатура для добавления воды
+def add_water_menu():
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add(InlineKeyboardButton("100 мл", callback_data="add_100"))
+    keyboard.add(InlineKeyboardButton("200 мл", callback_data="add_200"))
+    keyboard.add(InlineKeyboardButton("300 мл", callback_data="add_300"))
+    keyboard.add(InlineKeyboardButton("Ввести вручную", callback_data="add_custom"))
+    keyboard.add(InlineKeyboardButton("Назад", callback_data="main_menu"))
+    return keyboard
+
+# Клавиатура для статистики
+def stats_menu():
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add(InlineKeyboardButton("За день", callback_data="stats_day"))
+    keyboard.add(InlineKeyboardButton("За неделю", callback_data="stats_week"))
+    keyboard.add(InlineKeyboardButton("За месяц", callback_data="stats_month"))
+    keyboard.add(InlineKeyboardButton("Назад", callback_data="main_menu"))
+    return keyboard
+
+# Список саркастичных фраз
+sarcastic_phrases = [
+    "Ну что, герой, еще один глоток, и ты победишь жажду! 🍹",
+    "С таким темпом, ты станешь аквариумом! 🐟",
+    "Куда столько воды? Ты что, верблюд? 🐪",
+    "Кажется, я начинаю завидовать твоему унитазу... 🚽",
+    "Если продолжишь так пить, скоро станешь фонтаном! ⛲️"
+]
+
+@dp.message_handler(commands=['start'])
+async def send_welcome(message: types.Message):
+    await message.reply(
+        "Добро пожаловать в 'Арбузик'! 🍉\n"
+        "Я помогу тебе стать самым гидрированным человеком на планете! 💧",
+        reply_markup=main_menu()
+    )
+
+@dp.message_handler(lambda message: message.text == "🍉 Добавить воду")
+async def add_water(message: types.Message):
+    await message.reply("Выберите количество воды:", reply_markup=add_water_menu())
+
+@dp.callback_query_handler(lambda c: c.data.startswith("add_"))
+async def handle_add_water(callback_query: types.CallbackQuery):
+    data = callback_query.data
+    if data == "add_custom":
+        await bot.send_message(callback_query.from_user.id, "Введите количество воды (мл):")
+    else:
+        amount = int(data.split("_")[1])
+        phrase = random.choice(sarcastic_phrases)
+        await bot.send_message(callback_query.message.chat.id, f"Ты добавил {amount} мл воды! {phrase}")
+        # Отправляем картинку
+        with open("images/watermelon_funny.jpg", "rb") as photo:
+            await bot.send_photo(callback_query.message.chat.id, photo, caption="Арбузик гордится тобой! 🍉")
+
+@dp.message_handler(lambda message: message.text == "📊 Статистика")
+async def show_stats(message: types.Message):
+    await message.reply("Выберите период статистики:", reply_markup=stats_menu())
+
+@dp.callback_query_handler(lambda c: c.data.startswith("stats_"))
+async def handle_stats(callback_query: types.CallbackQuery):
+    period = {"day": "за день", "week": "за неделю", "month": "за месяц"}[callback_query.data.split("_")[1]]
+    # Здесь должна быть логика подсчета статистики
+    await bot.send_message(callback_query.message.chat.id, f"Ваша статистика {period}:")
+    # Отправляем пример статистики
+    with open("images/watermelon_stats.jpg", "rb") as photo:
+        await bot.send_photo(callback_query.message.chat.id, photo, caption=f"Вот твоя статистика {period}! 📊")
+
+@dp.message_handler(lambda message: message.text == "🏆 Рейтинг")
+async def show_leaderboard(message: types.Message):
+    # Пример рейтинга
+    leaderboard = "🏆 Топ-3 пользователей:\n1. @user1 - 2.5 л\n2. @user2 - 2.2 л\n3. @user3 - 2.0 л"
+    await message.reply(leaderboard, reply_markup=main_menu())
+
+@dp.message_handler(lambda message: message.text == "⚙️ Настройки")
+async def settings(message: types.Message):
+    await message.reply("Настройки пока недоступны. В будущем ты сможешь изменять цели и напоминания.", reply_markup=main_menu())
+
+@dp.message_handler(content_types=['text'])
+async def process_text(message: types.Message):
+    if message.text.isdigit():
+        amount = int(message.text)
+        phrase = random.choice(sarcastic_phrases)
+        await message.reply(f"Ты добавил {amount} мл воды! {phrase}")
+        # Отправляем картинку
+        with open("images/watermelon_funny.jpg", "rb") as photo:
+            await bot.send_photo(message.chat.id, photo, caption="Арбузик гордится тобой! 🍉")
+    else:
+        await message.reply("Неизвестная команда. Пожалуйста, выбери действие из меню.", reply_markup=main_menu())
+
+if __name__ == '__main__':
+    executor.start_polling(dp, skip_updates=True) 
