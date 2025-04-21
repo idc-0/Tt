@@ -1,0 +1,126 @@
+from aiogram import Bot, Dispatcher, F
+from aiogram.types import Message, CallbackQuery
+from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.state import StatesGroup, State
+import asyncio
+import random
+
+# Укажите токен вашего бота
+API_TOKEN = "ВАШ_ТОКЕН_БОТА"
+
+# Инициализация бота и диспетчера
+bot = Bot(token=API_TOKEN)
+dp = Dispatcher(storage=MemoryStorage())
+
+# Состояния для FSM (Finite State Machine)
+class UserStates(StatesGroup):
+    set_goal = State()
+    add_custom_water = State()
+
+# Главное меню
+def main_menu():
+    builder = ReplyKeyboardBuilder()
+    builder.button(text="🍉 Добавить воду")
+    builder.row(builder.button(text="📊 Статистика"), builder.button(text="🏆 Рейтинг"))
+    builder.button(text="🔔 Напоминания")
+    builder.row(builder.button(text="⚙️ Настройки"))
+    return builder.as_markup(resize_keyboard=True)
+
+# Клавиатура для добавления воды
+def add_water_menu():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="100 мл", callback_data="add_100")
+    builder.button(text="200 мл", callback_data="add_200")
+    builder.button(text="300 мл", callback_data="add_300")
+    builder.button(text="Ввести вручную", callback_data="add_custom")
+    builder.button(text="Назад", callback_data="main_menu")
+    return builder.as_markup()
+
+# Список саркастичных фраз
+sarcastic_phrases = [
+    "Ну что, герой, еще один глоток, и ты победишь жажду! 🍹",
+    "С таким темпом, ты станешь аквариумом! 🐟",
+    "Кажется, я начинаю завидовать твоему унитазу... 🚽",
+    "Если продолжишь так пить, скоро станешь фонтаном! ⛲️",
+]
+
+# Обработчик команды /start
+@dp.message(commands=["start"])
+async def send_welcome(message: Message):
+    await message.answer(
+        "Добро пожаловать в 'Арбузик'! 🍉\n"
+        "Я помогу тебе стать самым гидрированным человеком на планете! 💧",
+        reply_markup=main_menu()
+    )
+
+# Обработчик кнопки "Добавить воду"
+@dp.message(F.text == "🍉 Добавить воду")
+async def add_water(message: Message):
+    await message.answer("Выберите количество воды:", reply_markup=add_water_menu())
+
+# Обработчик Inline-кнопок
+@dp.callback_query()
+async def handle_callback(query: CallbackQuery, state: FSMContext):
+    data = query.data
+    if data == "main_menu":
+        await query.message.answer("Главное меню:", reply_markup=main_menu())
+    elif data.startswith("add_"):
+        if data == "add_custom":
+            await query.message.answer("Введите количество воды (мл):")
+            await state.set_state(UserStates.add_custom_water)
+        else:
+            amount = data.split("_")[1]
+            phrase = random.choice(sarcastic_phrases)
+            await query.message.answer(f"Ты добавил {amount} мл воды! {phrase}")
+    await query.answer()
+
+# Обработчик пользовательского ввода после выбора "Ввести вручную"
+@dp.message(UserStates.add_custom_water)
+async def handle_custom_water(message: Message, state: FSMContext):
+    if message.text.isdigit():
+        amount = int(message.text)
+        phrase = random.choice(sarcastic_phrases)
+        await message.answer(f"Ты добавил {amount} мл воды! {phrase}", reply_markup=main_menu())
+        await state.clear()
+    else:
+        await message.answer("Пожалуйста, введите число.")
+
+# Обработчик кнопки "Статистика"
+@dp.message(F.text == "📊 Статистика")
+async def show_stats(message: Message):
+    await message.answer("Ты пока не выполнил свою цель. Но Арбузик в тебя верит! 🍉")
+
+# Обработчик кнопки "Рейтинг"
+@dp.message(F.text == "🏆 Рейтинг")
+async def show_leaderboard(message: Message):
+    leaderboard = (
+        "🏆 Топ-3 пользователей:\n"
+        "1. @user1 - 2.5 л\n"
+        "2. @user2 - 2.2 л\n"
+        "3. @user3 - 2.0 л"
+    )
+    await message.answer(leaderboard)
+
+# Обработчик кнопки "Напоминания"
+@dp.message(F.text == "🔔 Напоминания")
+async def reminders(message: Message):
+    await message.answer(
+        "Напоминания пока в разработке. Скоро ты сможешь их настроить! 🔔"
+    )
+
+# Обработчик кнопки "Настройки"
+@dp.message(F.text == "⚙️ Настройки")
+async def settings(message: Message):
+    await message.answer(
+        "Настройки пока в разработке. В будущем ты сможешь изменить свои цели и параметры напоминаний. 🛠️"
+    )
+
+# Основная функция запуска бота
+async def main():
+    print("Бот запущен! 🍉")
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
